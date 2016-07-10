@@ -2,7 +2,6 @@
 extern crate log;
 
 extern crate daemonize;
-extern crate env_logger;
 extern crate fuse;
 extern crate libc;
 extern crate positioned_io;
@@ -13,14 +12,16 @@ mod fs;
 
 use std::env::args_os;
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{stderr, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::result::Result;
 
 use daemonize::Daemonize;
+use fuse::{Session, Filesystem};
 use qcow2::Qcow2;
 
 use self::fs::{ReadAtFs, md_to_attrs};
@@ -57,27 +58,9 @@ fn parse_args() -> Result<Args, Box<Error>> {
     })
 }
 
-use std::fs::OpenOptions;
-use std::sync::{Mutex};
-use std::path::{Path};
-use std::ffi::OsStr;
-use log::{Log, LogMetadata, LogRecord, LogLevelFilter};
-use fuse::{Session, Filesystem};
-
-struct Logger(pub Mutex<File>);
-impl Log for Logger {
-    fn enabled(&self, _metadata: &LogMetadata) -> bool {
-        true
-    }
-    fn log(&self, record: &LogRecord) {
-        let file = &mut self.0.lock().unwrap();
-        file.write_fmt(*record.args()).unwrap();
-        file.write_all(b"\n").unwrap();
-        file.flush().unwrap();
-    }
-}
-
-pub fn mount_daemonized<FS: Filesystem, P: AsRef<Path>> (filesystem: FS, mountpoint: &P, options: &[&OsStr]) {
+pub fn mount_daemonized<FS: Filesystem, P: AsRef<Path>>(filesystem: FS,
+                                                        mountpoint: &P,
+                                                        options: &[&OsStr]) {
     let mut sess = Session::new(filesystem, mountpoint.as_ref(), options);
     let daemonize = Daemonize::new().working_directory("/");
     die_unless(EXIT_ERROR, "Daemonizing failed", daemonize.start());
@@ -85,15 +68,6 @@ pub fn mount_daemonized<FS: Filesystem, P: AsRef<Path>> (filesystem: FS, mountpo
 }
 
 fn main() {
-    // env_logger::init().unwrap();
-    let log_file = die_unless(EXIT_ERROR, "", OpenOptions::new().write(true)
-        .create(true).truncate(true).open("/tmp/qcow.log"));
-    let logger = Logger(Mutex::new(log_file));
-    log::set_logger(|max| {
-        max.set(LogLevelFilter::Trace);
-        Box::new(logger)
-    }).unwrap();
-
     let args = die_unless(EXIT_USAGE, "", parse_args());
     let name = die_unless(EXIT_ERROR,
                           "",
