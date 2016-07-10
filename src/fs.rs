@@ -4,7 +4,8 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::result::Result;
 
-use fuse::{FileAttr, Filesystem, FileType, FUSE_ROOT_ID, ReplyAttr, ReplyData, ReplyDirectory, ReplyEntry, Request};
+use fuse::{FileAttr, Filesystem, FileType, FUSE_ROOT_ID, ReplyAttr, ReplyData, ReplyDirectory,
+           ReplyEntry, Request};
 use libc::{c_int, EIO, ENOENT, EPIPE};
 use positioned_io::{ReadAt, Size};
 use time::Timespec;
@@ -15,7 +16,10 @@ const INO_DIR: u64 = FUSE_ROOT_ID;
 const INO_FILE: u64 = 2;
 
 // Stat never changes!
-const TTL: Timespec = Timespec { sec: 1E+9 as i64, nsec: 0 };
+const TTL: Timespec = Timespec {
+    sec: 1E+9 as i64,
+    nsec: 0,
+};
 
 const BLOCKSIZE: u64 = 512;
 
@@ -86,18 +90,26 @@ impl<I: ReadAt + Size> Filesystem for ReadAtFs<I> {
         }
     }
 
-    fn getattr (&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {
+    fn getattr(&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {
         match ino {
             INO_DIR => reply.attr(&TTL, &self.attr),
-            INO_FILE => match self.file_attrs() {
-                Ok(attrs) => reply.attr(&TTL, &attrs),
-                Err(i) => reply.error(i),
-            },
+            INO_FILE => {
+                match self.file_attrs() {
+                    Ok(attrs) => reply.attr(&TTL, &attrs),
+                    Err(i) => reply.error(i),
+                }
+            }
             _ => reply.error(ENOENT),
         }
     }
 
-    fn read (&mut self, _req: &Request, ino: u64, _fh: u64, offset: u64, size: u32, reply: ReplyData) {
+    fn read(&mut self,
+            _req: &Request,
+            ino: u64,
+            _fh: u64,
+            offset: u64,
+            size: u32,
+            reply: ReplyData) {
         if ino == INO_FILE {
             let mut buf = vec![0; size as usize];
             match self.read.read_at(offset, &mut buf) {
@@ -109,7 +121,12 @@ impl<I: ReadAt + Size> Filesystem for ReadAtFs<I> {
         }
     }
 
-    fn readdir (&mut self, _req: &Request, ino: u64, _fh: u64, offset: u64, mut reply: ReplyDirectory) {
+    fn readdir(&mut self,
+               _req: &Request,
+               ino: u64,
+               _fh: u64,
+               offset: u64,
+               mut reply: ReplyDirectory) {
         if ino == INO_DIR {
             if offset == 0 {
                 reply.add(INO_DIR, 0, FileType::Directory, ".");

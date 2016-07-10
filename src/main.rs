@@ -51,9 +51,11 @@ fn parse_args() -> Result<Args, Box<Error>> {
     })
 }
 
-fn main () {
+fn main() {
     let args = die_unless(EXIT_USAGE, "", parse_args());
-    let name = die_unless(EXIT_ERROR, "", args.qcow2.file_stem().ok_or("No filename found"));
+    let name = die_unless(EXIT_ERROR,
+                          "",
+                          args.qcow2.file_stem().ok_or("No filename found"));
     let file = die_unless(EXIT_ERROR, "Opening file", File::open(&args.qcow2));
     let md = die_unless(EXIT_ERROR, "File attributes", file.metadata());
     let qcow2 = die_unless(EXIT_ERROR, "", Qcow2::open(file));
