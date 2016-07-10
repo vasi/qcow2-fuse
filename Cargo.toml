@@ -1,0 +1,11 @@
+[package]
+name = "qcow2-fuse"
+version = "0.1.0"
+authors = ["Dave Vasilevsky <dave@vasilevsky.ca>"]
+
+[dependencies]
+fuse = "0.2"
+time = "0.1.35"
+libc = "0.2.13"
+positioned-io = { path = "../positioned-io" }
+qcow2 = { path = "../qcow2-rs" }
