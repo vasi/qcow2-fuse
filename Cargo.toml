@@ -4,8 +4,11 @@ version = "0.1.0"
 authors = ["Dave Vasilevsky <dave@vasilevsky.ca>"]
 
 [dependencies]
-fuse = "0.2"
+#fuse = "0.2"
+fuse = { path = "../rust-fuse" }
 time = "0.1.35"
 libc = "0.2.13"
+log = "0.3"
+env_logger = "0.3.3"
 positioned-io = { path = "../positioned-io" }
 qcow2 = { path = "../qcow2-rs" }

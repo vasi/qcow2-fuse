@@ -58,8 +58,14 @@ impl<I: ReadAt + Size> ReadAtFs<I> {
     fn file_attrs(&self) -> Result<FileAttr, c_int> {
         let size = match self.read.size() {
             Ok(Some(size)) => size,
-            Ok(None) => return Err(EPIPE),
-            Err(e) => return Err(Self::errcode(e)),
+            Ok(None) => {
+                warn!("SIZE: None");
+                return Err(EPIPE);
+            },
+            Err(e) => {
+                warn!("SIZE: {}", e);
+                return Err(Self::errcode(e));
+            },
         };
 
         let mut blocks = size / BLOCKSIZE;
@@ -113,7 +119,10 @@ impl<I: ReadAt + Size> Filesystem for ReadAtFs<I> {
         if ino == INO_FILE {
             let mut buf = vec![0; size as usize];
             match self.read.read_at(offset, &mut buf) {
-                Err(e) => reply.error(Self::errcode(e)),
+                Err(e) => {
+                    warn!("READ: {}", e);
+                    reply.error(Self::errcode(e));
+                },
                 Ok(size) => reply.data(&buf[..size]),
             }
         } else {

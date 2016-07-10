@@ -1,3 +1,7 @@
+#[macro_use]
+extern crate log;
+
+extern crate env_logger;
 extern crate fuse;
 extern crate libc;
 extern crate positioned_io;
@@ -52,6 +56,8 @@ fn parse_args() -> Result<Args, Box<Error>> {
 }
 
 fn main() {
+    env_logger::init().unwrap();
+
     let args = die_unless(EXIT_USAGE, "", parse_args());
     let name = die_unless(EXIT_ERROR,
                           "",
