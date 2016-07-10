@@ -58,7 +58,7 @@ fn parse_args() -> Result<Args, Box<Error>> {
     })
 }
 
-pub fn mount_daemonized<FS: Filesystem, P: AsRef<Path>>(filesystem: FS,
+fn mount_daemonized<FS: Filesystem, P: AsRef<Path>>(filesystem: FS,
                                                         mountpoint: &P,
                                                         options: &[&OsStr]) {
     let mut sess = Session::new(filesystem, mountpoint.as_ref(), options);
