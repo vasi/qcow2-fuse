@@ -61,11 +61,11 @@ impl<I: ReadAt + Size> ReadAtFs<I> {
             Ok(None) => {
                 warn!("SIZE: None");
                 return Err(EPIPE);
-            },
+            }
             Err(e) => {
                 warn!("SIZE: {}", e);
                 return Err(Self::errcode(e));
-            },
+            }
         };
 
         let mut blocks = size / BLOCKSIZE;
@@ -122,7 +122,7 @@ impl<I: ReadAt + Size> Filesystem for ReadAtFs<I> {
                 Err(e) => {
                     warn!("READ: {}", e);
                     reply.error(Self::errcode(e));
-                },
+                }
                 Ok(size) => reply.data(&buf[..size]),
             }
         } else {
