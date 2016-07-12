@@ -4,6 +4,7 @@ version = "0.1.0"
 dependencies = [
  "daemonize 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fuse 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "positioned-io 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -45,6 +46,11 @@ dependencies = [
  "thread-scoped 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "getopts"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "kernel32-sys"
