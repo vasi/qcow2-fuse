@@ -6,7 +6,7 @@ use std::result::Result;
 
 use fuse::{FileAttr, Filesystem, FileType, FUSE_ROOT_ID, ReplyAttr, ReplyData, ReplyDirectory,
            ReplyEntry, Request};
-use libc::{c_int, EIO, ENOENT, EPIPE};
+use libc::{c_int, EIO, ENOENT, EPIPE, raise, SIGINT};
 use positioned_io::{ReadAt, Size};
 use time::Timespec;
 
@@ -47,6 +47,7 @@ pub struct ReadAtFs<I: ReadAt + Size> {
     pub name: PathBuf,
     // Base attributes.
     pub attr: FileAttr,
+    pub foreground: bool,
 }
 impl<I: ReadAt + Size> ReadAtFs<I> {
     fn errcode(err: io::Error) -> c_int {
@@ -145,6 +146,13 @@ impl<I: ReadAt + Size> Filesystem for ReadAtFs<I> {
             reply.ok();
         } else {
             reply.error(ENOENT);
+        }
+    }
+
+    fn destroy(&mut self, _req: &Request) {
+        // Stop waiting for Ctrl-C.
+        if self.foreground {
+            unsafe { raise(SIGINT) };
         }
     }
 }

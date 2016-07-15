@@ -17,13 +17,17 @@ use std::ffi::OsStr;
 use std::fmt::Display;
 use std::fs::{File, metadata};
 use std::io::{stderr, stdout, Write};
+use std::marker::Send;
+use std::mem::drop;
 use std::path::Path;
 use std::process::exit;
+use std::ptr::null_mut;
 use std::result::Result;
 
 use daemonize::Daemonize;
 use env_logger::LogBuilder;
 use fuse::{Session, Filesystem};
+use libc::{sigset_t, c_int, SIGINT, SIG_BLOCK, sigemptyset, sigaddset, sigwait, pthread_sigmask};
 use qcow2::Qcow2;
 
 use self::fs::{ReadAtFs, md_to_attrs};
@@ -141,19 +145,57 @@ struct Matches {
     options: Vec<String>,
 }
 
-fn mount<FS: Filesystem, P: AsRef<Path>>(filesystem: FS,
-                                         mountpoint: &P,
-                                         foreground: bool,
-                                         options: Vec<String>) {
+
+fn run_foreground<FS: Filesystem + Send>(sess: Session<FS>) {
+    // Block signals.
+    let mut sigset: sigset_t = 0 as sigset_t;
+    let sigsetp: *mut sigset_t = &mut sigset;
+    unsafe {
+        sigemptyset(sigsetp);
+        sigaddset(sigsetp, SIGINT);
+        pthread_sigmask(SIG_BLOCK, sigsetp, null_mut());
+    }
+
+    // Start our background thread.
+    let background: fuse::BackgroundSession = unsafe { sess.spawn() }.or_die("Can't spawn session");
+
+    // Wait for SIGINT.
+    loop {
+        let mut sig: c_int = 0;
+        let sigp: *mut c_int = &mut sig;
+        let e = unsafe { sigwait(sigsetp, sigp) };
+        if e == 0 && sig == SIGINT {
+            // Break the loop, drop the guard, and unmount.
+            break;
+        }
+    }
+
+    drop(background); // Filesystem dies.
+}
+
+fn run_background<FS: Filesystem + Send>(mut sess: Session<FS>) {
+    // Daemonize, then run.
+    let daemonize = Daemonize::new().working_directory("/");
+    daemonize.start().or_die("Failed to daemonize");
+    sess.run();
+}
+
+fn mount<FS: Filesystem + Send, P: AsRef<Path>>(filesystem: FS,
+                                                mountpoint: &P,
+                                                foreground: bool,
+                                                options: Vec<String>) {
+    // Build the opt array. Include fuse options starting with -o.
     let opts: Vec<String> = options.iter().map(|s| format!("-o{}", s)).collect();
     let opts: Vec<&OsStr> = opts.iter().map(|s| OsStr::new(s)).collect();
     debug!("FUSE options: {:?}", opts);
-    let mut sess = Session::new(filesystem, mountpoint.as_ref(), opts.as_slice());
-    if !foreground {
-        let daemonize = Daemonize::new().working_directory("/");
-        daemonize.start().or_die("Failed to daemonize");
+
+    // Setup the session now, before any chroot.
+    let sess = Session::new(filesystem, mountpoint.as_ref(), opts.as_slice());
+    if foreground {
+        run_foreground(sess);
+    } else {
+        run_background(sess);
     }
-    sess.run();
 }
 
 trait OrDie<T> {
@@ -178,6 +220,7 @@ fn set_logger(debug: bool) {
     builder.init().unwrap();
 }
 
+
 fn main() {
     let matches = Options::new().parse();
     set_logger(matches.debug);
@@ -186,7 +229,7 @@ fn main() {
     match metadata(&matches.mountpoint) {
         Err(e) => error(&format!("Can't access mountpoint: {}", e)),
         Ok(ref m) if !m.is_dir() => error("Mountpoint must be a directory"),
-        _ => {},
+        _ => {}
     }
 
     // Get the basename of the qcow file.
@@ -212,9 +255,7 @@ fn main() {
         read: reader,
         name: From::from(name),
         attr: md_to_attrs(md),
+        foreground: matches.foreground,
     };
     mount(fs, &matches.mountpoint, matches.foreground, matches.options);
 }
-
-// FIXME: options
-// FIXME: unmount on Ctrl-C
