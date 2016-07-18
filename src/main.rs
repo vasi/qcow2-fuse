@@ -235,7 +235,7 @@ fn main() {
     // Get the basename of the qcow file.
     let path = Path::new(&matches.qcow2);
     let mut name = path.file_name().unwrap_or(OsStr::new("disk"));
-    if path.extension() == Some(OsStr::new(".qcow2")) {
+    if path.extension() == Some(OsStr::new("qcow2")) {
         if let Some(n) = path.file_stem() {
             name = n;
         }

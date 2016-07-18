@@ -152,6 +152,7 @@ impl<I: ReadAt + Size> Filesystem for ReadAtFs<I> {
     fn destroy(&mut self, _req: &Request) {
         // Stop waiting for Ctrl-C.
         if self.foreground {
+            error!("Ignore any \"Failed to unmount\" message.");
             unsafe { raise(SIGINT) };
         }
     }
