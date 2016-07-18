@@ -26,7 +26,7 @@ use std::result::Result;
 
 use daemonize::Daemonize;
 use env_logger::LogBuilder;
-use fuse::{Session, Filesystem};
+use fuse::{BackgroundSession, Session, Filesystem};
 use libc::{sigset_t, c_int, SIGINT, SIG_BLOCK, sigemptyset, sigaddset, sigwait, pthread_sigmask};
 use qcow2::Qcow2;
 
@@ -157,7 +157,7 @@ fn run_foreground<FS: Filesystem + Send>(sess: Session<FS>) {
     }
 
     // Start our background thread.
-    let background: fuse::BackgroundSession = unsafe { sess.spawn() }.or_die("Can't spawn session");
+    let background: BackgroundSession = unsafe { sess.spawn() }.or_die("Can't spawn session");
 
     // Wait for SIGINT.
     loop {
