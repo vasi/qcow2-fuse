@@ -1,21 +1,20 @@
-use std::fs::Metadata;
-use std::io;
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::result::Result;
 
 use fuse::{FileAttr, Filesystem, FileType, FUSE_ROOT_ID, ReplyAttr, ReplyData, ReplyDirectory,
            ReplyEntry, Request};
-use libc::{c_int, EIO, ENOENT, EPIPE, raise, SIGINT};
+use libc::{c_int, ENOENT, EPIPE, raise, SIGINT};
 use positioned_io::{ReadAt, Size};
 use time::Timespec;
+
+use fuse_util::fuse_errcode;
 
 
 // The inodes for our only directory and our file.
 const INO_DIR: u64 = FUSE_ROOT_ID;
 const INO_FILE: u64 = 2;
 
-// Stat never changes!
+// We are read only, so allow an essentially infinite TTL.
 const TTL: Timespec = Timespec {
     sec: 1E+9 as i64,
     nsec: 0,
@@ -23,39 +22,20 @@ const TTL: Timespec = Timespec {
 
 const BLOCKSIZE: u64 = 512;
 
-pub fn md_to_attrs(md: Metadata) -> FileAttr {
-    FileAttr {
-        ino: 1,
-        size: 0,
-        blocks: 0,
-        kind: FileType::Directory,
-        perm: 0o755,
-        nlink: 2,
-        rdev: 0,
-        flags: 0,
-        atime: Timespec::new(md.atime(), md.atime_nsec() as i32),
-        mtime: Timespec::new(md.mtime(), md.mtime_nsec() as i32),
-        ctime: Timespec::new(md.ctime(), md.ctime_nsec() as i32),
-        crtime: Timespec::new(md.ctime(), md.ctime_nsec() as i32),
-        uid: md.uid(),
-        gid: md.gid(),
-    }
-}
-
 pub struct ReadAtFs<I: ReadAt + Size> {
+    // The thing we're reading from.
     pub read: I,
+
+    // The name of our only file.
     pub name: PathBuf,
-    // Base attributes.
+
+    // The attributes we will use for files and directories.
     pub attr: FileAttr,
+
+    // Whether or not we're running in the foreground.
     pub foreground: bool,
 }
 impl<I: ReadAt + Size> ReadAtFs<I> {
-    fn errcode(err: io::Error) -> c_int {
-        match err.raw_os_error() {
-            Some(i) => i,
-            None => EIO,
-        }
-    }
     fn file_attrs(&self) -> Result<FileAttr, c_int> {
         let size = match self.read.size() {
             Ok(Some(size)) => size,
@@ -65,7 +45,7 @@ impl<I: ReadAt + Size> ReadAtFs<I> {
             }
             Err(e) => {
                 warn!("SIZE: {}", e);
-                return Err(Self::errcode(e));
+                return Err(fuse_errcode(e));
             }
         };
 
@@ -122,7 +102,7 @@ impl<I: ReadAt + Size> Filesystem for ReadAtFs<I> {
             match self.read.read_at(offset, &mut buf) {
                 Err(e) => {
                     warn!("READ: {}", e);
-                    reply.error(Self::errcode(e));
+                    reply.error(fuse_errcode(e));
                 }
                 Ok(size) => reply.data(&buf[..size]),
             }

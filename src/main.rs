@@ -11,219 +11,24 @@ extern crate qcow2;
 extern crate time;
 
 mod fs;
+mod fuse_util;
+mod opts;
+mod util;
 
-use std::env;
 use std::ffi::OsStr;
-use std::fmt::Display;
 use std::fs::{File, metadata};
-use std::io::{stderr, stdout, Write};
-use std::marker::Send;
-use std::mem::drop;
 use std::path::Path;
-use std::process::exit;
-use std::ptr::null_mut;
-use std::result::Result;
 
-use daemonize::Daemonize;
-use env_logger::LogBuilder;
-use fuse::{BackgroundSession, Session, Filesystem};
-use libc::{sigset_t, c_int, SIGINT, SIG_BLOCK, sigemptyset, sigaddset, sigwait, pthread_sigmask};
 use qcow2::Qcow2;
 
-use self::fs::{ReadAtFs, md_to_attrs};
-
-
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-const NAME: &'static str = env!("CARGO_PKG_NAME");
-
-#[derive(PartialEq)]
-enum Exit {
-    Ok = 0,
-    Error = 1,
-    Usage = 2,
-}
-fn error(message: &str) -> ! {
-    writeln!(stderr(), "{}", message).unwrap();
-    exit(Exit::Error as i32);
-}
-
-
-struct Options {
-    opts: getopts::Options,
-    progname: String,
-    args: Vec<String>,
-}
-impl Options {
-    fn new() -> Self {
-        let mut opts = getopts::Options::new();
-        opts.optflag("h", "help", "Show this help")
-            .optflag("V", "version", "Show this program's version")
-            .optflag("f", "foreground", "Run in foreground")
-            .optflag("d", "debug", "Run in foreground and show debug info")
-            .optmulti("o", "o", "Provide a FUSE option", "OPTION");
-        let mut args: Vec<String> = std::env::args().collect();
-
-        let progname = args.remove(0);
-        let progname = match Path::new(&progname).file_name() {
-            Some(p) => p.to_string_lossy().into_owned(),
-            None => NAME.to_owned(),
-        };
-
-        Options {
-            opts: opts,
-            progname: progname,
-            args: args,
-        }
-    }
-
-    fn parse(&self) -> Matches {
-        let matches = match self.opts.parse(&self.args) {
-            Ok(m) => m,
-            Err(e) => self.error(&e.to_string()),
-        };
-        if matches.opt_present("h") {
-            self.usage(Exit::Ok);
-        }
-        if matches.opt_present("V") {
-            self.version();
-        }
-
-        let mut free = matches.free.iter();
-        let qcow2 = match free.next() {
-            Some(q) => q,
-            None => self.usage(Exit::Usage),
-        };
-        let mountpoint = match free.next() {
-            Some(m) => m,
-            None => self.error("No mountpoint provided."),
-        };
-        if free.next().is_some() {
-            self.error("Too many arguments.");
-        }
-
-        Matches {
-            qcow2: qcow2.to_owned(),
-            mountpoint: mountpoint.to_owned(),
-            foreground: matches.opt_present("f") || matches.opt_present("d"),
-            debug: matches.opt_present("d"),
-            options: matches.opt_strs("o"),
-        }
-    }
-
-    fn brief(&self) -> String {
-        format!("{}: Mount qcow2 images\n\nUsage: {} [options] QCOW2 MOUNTPOINT",
-                self.progname,
-                self.progname)
-    }
-
-    fn version(&self) -> ! {
-        println!("{} version {}", self.progname, VERSION);
-        exit(Exit::Ok as i32);
-    }
-
-    fn usage(&self, code: Exit) -> ! {
-        let mut f: Box<Write> = if code == Exit::Ok {
-            Box::new(stdout())
-        } else {
-            Box::new(stderr())
-        };
-        writeln!(f, "{}", self.opts.usage(&self.brief())).unwrap();
-        exit(code as i32);
-    }
-
-    fn error(&self, message: &str) -> ! {
-        writeln!(stderr(), "Error: {}\n\n", message).unwrap();
-        self.usage(Exit::Error);
-    }
-}
-
-struct Matches {
-    mountpoint: String,
-    qcow2: String,
-    foreground: bool,
-    debug: bool,
-    options: Vec<String>,
-}
-
-
-fn run_foreground<FS: Filesystem + Send>(sess: Session<FS>) {
-    // Block signals.
-    let mut sigset: sigset_t = 0 as sigset_t;
-    let sigsetp: *mut sigset_t = &mut sigset;
-    unsafe {
-        sigemptyset(sigsetp);
-        sigaddset(sigsetp, SIGINT);
-        pthread_sigmask(SIG_BLOCK, sigsetp, null_mut());
-    }
-
-    // Start our background thread.
-    let background: BackgroundSession = unsafe { sess.spawn() }.or_die("Can't spawn session");
-
-    // Wait for SIGINT.
-    loop {
-        let mut sig: c_int = 0;
-        let sigp: *mut c_int = &mut sig;
-        let e = unsafe { sigwait(sigsetp, sigp) };
-        if e == 0 && sig == SIGINT {
-            // Break the loop, drop the guard, and unmount.
-            break;
-        }
-    }
-
-    drop(background); // Filesystem dies.
-}
-
-fn run_background<FS: Filesystem + Send>(mut sess: Session<FS>) {
-    // Daemonize, then run.
-    let daemonize = Daemonize::new().working_directory("/");
-    daemonize.start().or_die("Failed to daemonize");
-    sess.run();
-}
-
-fn mount<FS: Filesystem + Send, P: AsRef<Path>>(filesystem: FS,
-                                                mountpoint: &P,
-                                                foreground: bool,
-                                                options: Vec<String>) {
-    // Build the opt array. Include fuse options starting with -o.
-    let opts: Vec<String> = options.iter().map(|s| format!("-o{}", s)).collect();
-    let opts: Vec<&OsStr> = opts.iter().map(|s| OsStr::new(s)).collect();
-    debug!("FUSE options: {:?}", opts);
-
-    // Setup the session now, before any chroot.
-    let sess = Session::new(filesystem, mountpoint.as_ref(), opts.as_slice());
-    if foreground {
-        run_foreground(sess);
-    } else {
-        run_background(sess);
-    }
-}
-
-trait OrDie<T> {
-    fn or_die(self, msg: &str) -> T;
-}
-impl<T, E: Display> OrDie<T> for Result<T, E> {
-    fn or_die(self, msg: &str) -> T {
-        match self {
-            Ok(t) => t,
-            Err(e) => error(&format!("{}: {}", msg, e)),
-        }
-    }
-}
-
-fn set_logger(debug: bool) {
-    let mut builder = LogBuilder::new();
-    if debug {
-        builder.parse("debug");
-    } else if let Ok(v) = env::var("RUST_LOG") {
-        builder.parse(&v);
-    }
-    builder.init().unwrap();
-}
+use fs::ReadAtFs;
+use util::{error, OrDie};
+use opts::Options;
 
 
 fn main() {
     let matches = Options::new().parse();
-    set_logger(matches.debug);
+    util::set_logger(matches.debug);
 
     // Check that the mountpoint looks ok.
     match metadata(&matches.mountpoint) {
@@ -254,8 +59,8 @@ fn main() {
     let fs = ReadAtFs {
         read: reader,
         name: From::from(name),
-        attr: md_to_attrs(md),
+        attr: fuse_util::md_to_attrs(md),
         foreground: matches.foreground,
     };
-    mount(fs, &matches.mountpoint, matches.foreground, matches.options);
+    fuse_util::mount(fs, &matches.mountpoint, matches.foreground, matches.options);
 }
