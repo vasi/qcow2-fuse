@@ -22,6 +22,7 @@ const TTL: Timespec = Timespec {
 
 const BLOCKSIZE: u64 = 512;
 
+// Take any ReadAt, and expose it as a fuse::Filesystem.
 pub struct ReadAtFs<I: ReadAt + Size> {
     // The thing we're reading from.
     pub read: I,
@@ -36,7 +37,9 @@ pub struct ReadAtFs<I: ReadAt + Size> {
     pub foreground: bool,
 }
 impl<I: ReadAt + Size> ReadAtFs<I> {
+    // Get the file attributes for our only file.
     fn file_attrs(&self) -> Result<FileAttr, c_int> {
+        // FUSE needs a size, error out if we can't get one.
         let size = match self.read.size() {
             Ok(Some(size)) => size,
             Ok(None) => {

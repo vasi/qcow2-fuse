@@ -1,4 +1,4 @@
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fs::Metadata;
 use std::io;
 use std::os::unix::fs::MetadataExt;
@@ -7,7 +7,8 @@ use std::ptr::null_mut;
 
 use daemonize::Daemonize;
 use fuse::{BackgroundSession, FileAttr, Filesystem, FileType, Session};
-use libc::{c_int, EIO, pthread_sigmask, SIG_BLOCK, SIGINT, sigemptyset, sigaddset, sigset_t, sigwait};
+use libc::{c_int, EIO, pthread_sigmask, SIG_BLOCK, SIGINT, sigemptyset, sigaddset, sigset_t,
+           sigwait};
 use time::Timespec;
 
 use util::OrDie;
@@ -74,17 +75,17 @@ fn run_background<FS: Filesystem + Send>(mut sess: Session<FS>) {
 }
 
 // Mount a filesystem at a path.
-pub fn mount<FS: Filesystem + Send, P: AsRef<Path>>(filesystem: FS,
-                                                mountpoint: &P,
-                                                foreground: bool,
-                                                options: Vec<String>) {
-    // Build the opt array. Include fuse options starting with -o.
-    let opts: Vec<String> = options.iter().map(|s| format!("-o{}", s)).collect();
-    let opts: Vec<&OsStr> = opts.iter().map(|s| OsStr::new(s)).collect();
-    debug!("FUSE options: {:?}", opts);
+pub fn mount<FS: Filesystem + Send, P: AsRef<Path>, S: AsRef<OsStr>, O: IntoIterator<Item = S>>
+    (filesystem: FS,
+     mountpoint: &P,
+     foreground: bool,
+     options: O) {
+    let options: Vec<OsString> = options.into_iter().map(|i| i.as_ref().to_owned()).collect();
+    let options: Vec<&OsStr> = options.iter().map(|i| i.as_ref()).collect();
+    debug!("FUSE options: {:?}", options);
 
     // Setup the session now, before any chroot.
-    let sess = Session::new(filesystem, mountpoint.as_ref(), opts.as_slice());
+    let sess = Session::new(filesystem, mountpoint.as_ref(), options.as_slice());
     if foreground {
         run_foreground(sess);
     } else {
