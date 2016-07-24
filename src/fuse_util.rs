@@ -38,6 +38,12 @@ pub fn md_to_attrs(md: Metadata) -> FileAttr {
 // Mount a filesystem in the foreground.
 //
 // This is complicated, because we want to listen for Control-C.
+// We'd like to just listen for Control-C on a background thread, but then there's no way to
+// signal the foreground thread to stop, since fuse::Channel::unmount() is private.
+//
+// The solution is to spawn a background FUSE session, and then drop it when we detect Ctrl-C.
+// If the filesystem is unmounted in another way (eg: umount at the command-line), it will just
+// cause a harmless extra attempt to unmount.
 fn run_foreground<FS: Filesystem + Send>(sess: Session<FS>) {
     // Block signals on all threads.
     let mut sigset: sigset_t = 0 as sigset_t;
