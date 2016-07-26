@@ -2,6 +2,13 @@
 name = "qcow2-fuse"
 version = "0.1.0"
 authors = ["Dave Vasilevsky <dave@vasilevsky.ca>"]
+description = "Mounting qcow2 virtual disk images"
+keywords = ["qcow2", "qemu", "disk", "fuse"]
+license = "MIT"
+repository = "https://github.com/vasi/qcow2-fuse"
+repository = "https://github.com/vasi/qcow2-fuse"
+homepage = "https://github.com/vasi/qcow2-fuse"
+readme = "README.md"
 
 [dependencies]
 fuse = "0.2"
