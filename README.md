@@ -2,14 +2,14 @@
 
 This program allows you to mount [qcow2](https://en.wikipedia.org/wiki/Qcow) virtual disk images as [FUSE](https://github.com/libfuse/libfuse) filesystems. 
 
-* [Usage](#Usage)
-    * [Using the mounted image](#Using-the-mounted-image)
-    * [Partitions](#Partitions)
-    * [Options](#Options)
-* [Installation](#Installation)
-* [Features](#Features)
-* [License](#License)
-* [See also](#See-also)
+* [Usage](#usage)
+    * [Using the mounted image](#using-the-mounted-image)
+    * [Partitions](#partitions)
+    * [Options](#options)
+* [Installation](#installation)
+* [Features](#features)
+* [License](#license)
+* [See also](#see-also)
 
 ## Usage
 
@@ -82,5 +82,7 @@ This program is available under the [MIT license](MIT-LICENSE).
 
 * [qcow2](https://en.wikipedia.org/wiki/Qcow)
 * [FUSE](https://github.com/libfuse/libfuse)
+* [FUSE for OS X](https://osxfuse.github.io/)
 * [Rust](https://www.rust-lang.org)
 * [ext4fuse](https://github.com/gerard/ext4fuse)
+* [kpartx](http://manpages.ubuntu.com/manpages/xenial/man8/kpartx.8.html)
