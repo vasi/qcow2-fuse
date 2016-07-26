@@ -57,9 +57,20 @@ Many options starting with `-o` will be passed through to FUSE. You can read abo
 
 ## Installation
 
-This program is written in Rust, and links to libfuse.
+The best way to install this right now is using [cargo](https://crates.io/), the [Rust](https://www.rust-lang.org/) package manager.
 
-...
+First, you'll need Rust and Cargo themselves. You can [download them here](https://www.rust-lang.org/en-US/downloads.html).
+
+Second, you'll need to have FUSE installed, and `pkg-config` so that we can find it. Here are some examples of how to get those:
+
+* Ubuntu: `sudo apt-get install libfuse-dev pkg-config`
+* macOS: Install [MacPorts](https://www.macports.org/), then `sudo port install osxfuse pkgconfig`
+
+Finally, you can install this program: `cargo install qcow2-fuse`
+
+### Binaries
+
+I'll try to make these available when I have the bandwidth.
 
 ## Features
 
