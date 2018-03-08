@@ -4,6 +4,7 @@ use std::io;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::ptr::null_mut;
+use std::mem;
 
 use daemonize::Daemonize;
 use fuse::{BackgroundSession, FileAttr, Filesystem, FileType, Session};
@@ -46,9 +47,11 @@ pub fn md_to_attrs(md: Metadata) -> FileAttr {
 // cause a harmless extra attempt to unmount.
 fn run_foreground<FS: Filesystem + Send>(sess: Session<FS>) {
     // Block signals on all threads.
-    let mut sigset: sigset_t = 0 as sigset_t;
-    let sigsetp: *mut sigset_t = &mut sigset;
+    let mut sigset: sigset_t;
+    let sigsetp: *mut sigset_t;
     unsafe {
+        sigset = mem::zeroed();
+        sigsetp = &mut sigset;
         sigemptyset(sigsetp);
         sigaddset(sigsetp, SIGINT);
         pthread_sigmask(SIG_BLOCK, sigsetp, null_mut());
