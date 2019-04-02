@@ -30,7 +30,7 @@ impl Options {
             .optflag("V", "version", "Show this program's version")
             .optflag("f", "foreground", "Run in foreground")
             .optflag("d", "debug", "Run in foreground and show debug info")
-            .optmulti("o", "o", "Provide a FUSE option", "OPTION");
+            .optmulti("o", "", "Provide a FUSE option", "OPTION");
         let mut args: Vec<String> = env::args().collect();
 
         // Try to get the program name from the command-line. Otherwise, just use the cargo
