@@ -105,7 +105,7 @@ impl Options {
 
     // Print this program's usage and exit.
     fn usage(&self, code: Exit) -> ! {
-        let mut f: Box<Write> = if code == Exit::Ok {
+        let mut f: Box<dyn Write> = if code == Exit::Ok {
             Box::new(stdout())
         } else {
             Box::new(stderr())
